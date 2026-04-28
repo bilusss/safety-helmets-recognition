@@ -1,0 +1,9 @@
+[project]
+name = "safety-helmets-recognition"
+version = "0.1.0"
+description = "Safety helmets recognition system"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy",
+    "pandas",
+]

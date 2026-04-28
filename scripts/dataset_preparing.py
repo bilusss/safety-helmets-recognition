@@ -281,21 +281,27 @@ def process_dataset3() -> None:
     if not label_files:
         print("Dataset 3: no .txt label files found, skipping.")
         return
-
+    
     processed = skipped = 0
     for lbl_src in sorted(label_files):
-        # find matching image
+        # skip the YOLO classes.txt file (not an annotation file)
+        if lbl_src.name == "classes.txt":
+            continue
+
+        # find matching image: look next to the label, or in the parallel
+        # images/<split>/ folder (dataset3 layout: dataset3/{images,labels}/<split>/)
         img_src = None
         for ext in (".jpg", ".jpeg", ".png", ".bmp"):
             candidate = lbl_src.with_suffix(ext)
             if candidate.exists():
                 img_src = candidate
                 break
-            # sometimes images live in a sibling "images/" folder
-            sibling_images = lbl_src.parent.parent / "images" / (lbl_src.stem + ext)
-            if sibling_images.exists():
-                img_src = sibling_images
-                break
+            # parallel images/<split>/ folder, e.g. dataset3/images/train/000001.jpg
+            if len(lbl_src.parents) >= 3:
+                parallel = lbl_src.parents[2] / "images" / lbl_src.parent.name / (lbl_src.stem + ext)
+                if parallel.exists():
+                    img_src = parallel
+                    break
 
         if img_src is None:
             continue

@@ -1,6 +1,7 @@
 from pathlib import Path
 from zipfile import ZipFile
 from xml.etree import ElementTree as ET
+import hashlib
 import shutil
 
 import numpy as np
@@ -14,8 +15,12 @@ PROC_DIR   = ROOT / "data" / "processed"
 IMG_DIR    = PROC_DIR / "images"
 LBL_DIR    = PROC_DIR / "labels"
 
-# global counter so every image gets a unique 6-digit name 
+# global counter so every image gets a unique 6-digit name
 _counter: list[int] = [1]
+
+# map of image hash -> first stored filename, used to avoid duplicates
+_seen_hashes: dict[str, str] = {}
+_skipped_duplicates: list[tuple[str, str]] = []
 
 def _next_id() -> str:
     idx = _counter[0]
@@ -45,11 +50,29 @@ def dataset_unzipping() -> None:
             print(f"Unzipping {zip_file.name} failed: {e}")
 
 
-def copy_image(src: Path) -> Path:
+def _hash_image(path: Path, chunk_size: int = 1024 * 1024) -> str:
+    """Compute a stable hash of the image bytes for deduping."""
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(chunk_size)
+            if not chunk:
+                break
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def copy_image(src: Path) -> Path | None:
     """Copy src image to IMG_DIR as <id>.jpg and return the label path."""
+    img_hash = _hash_image(src)
+    if img_hash in _seen_hashes:
+        _skipped_duplicates.append((str(src), _seen_hashes[img_hash]))
+        return None
+
     new_stem = _next_id()
     dst = IMG_DIR / f"{new_stem}.jpg"
     shutil.copy2(src, dst)
+    _seen_hashes[img_hash] = dst.name
     return LBL_DIR / f"{new_stem}.txt"
 
 
@@ -150,6 +173,9 @@ def process_dataset1() -> None:
             continue  # skip images with no valid annotations
 
         lbl_path = copy_image(img_src)
+        if lbl_path is None:
+            continue
+
         write_labels(lbl_path, rows)
         processed += 1
 
@@ -240,6 +266,9 @@ def process_dataset2() -> None:
                 continue
 
             lbl_path = copy_image(img_src)
+            if lbl_path is None:
+                continue
+
             write_labels(lbl_path, rows)
             processed += 1
 
@@ -315,6 +344,9 @@ def process_dataset3() -> None:
             continue
 
         lbl_path = copy_image(img_src)
+        if lbl_path is None:
+            continue
+
         write_labels(lbl_path, rows)
         processed += 1
 
@@ -329,4 +361,6 @@ if __name__ == "__main__":
     process_dataset1()
     process_dataset2()
     process_dataset3()
+    if _skipped_duplicates:
+        print(f"Skipped duplicate images: {len(_skipped_duplicates)}")
     print(f"\nDone. Total images written: {_counter[0] - 1}")

@@ -80,6 +80,16 @@ def write_labels(label_path: Path, rows: list[str]) -> None:
     label_path.write_text("\n".join(rows) + "\n")
 
 
+def write_labels_if_new(img_src: Path, rows: list[str]) -> bool:
+    """Copy image and write labels; return True when written."""
+    lbl_path = copy_image(img_src)
+    if lbl_path is None:
+        return False
+
+    write_labels(lbl_path, rows)
+    return True
+
+
 # Dataset 1 - GDUT-HWD (XML annotations)
 # XML tag mapping: "none" -> 0 (head), anything else (blue/white/yellow/red) -> 1 (helmet)
 
@@ -172,12 +182,8 @@ def process_dataset1() -> None:
         if not rows:
             continue  # skip images with no valid annotations
 
-        lbl_path = copy_image(img_src)
-        if lbl_path is None:
-            continue
-
-        write_labels(lbl_path, rows)
-        processed += 1
+        if write_labels_if_new(img_src, rows):
+            processed += 1
 
     print(f"Dataset 1: processed {processed} images.")
 
@@ -265,12 +271,8 @@ def process_dataset2() -> None:
                 skipped += 1
                 continue
 
-            lbl_path = copy_image(img_src)
-            if lbl_path is None:
-                continue
-
-            write_labels(lbl_path, rows)
-            processed += 1
+            if write_labels_if_new(img_src, rows):
+                processed += 1
 
     print(f"Dataset 2: processed {processed} images, skipped {skipped} person-only images.")
 
@@ -343,12 +345,8 @@ def process_dataset3() -> None:
             skipped += 1
             continue
 
-        lbl_path = copy_image(img_src)
-        if lbl_path is None:
-            continue
-
-        write_labels(lbl_path, rows)
-        processed += 1
+        if write_labels_if_new(img_src, rows):
+            processed += 1
 
     print(f"Dataset 3: processed {processed} images, skipped {skipped} vest/person-only images.")
 

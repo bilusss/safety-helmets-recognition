@@ -32,10 +32,35 @@ Download the following three datasets from the links below:
 Run the following command in the project folder (root directory) to automatically process and organize the datasets:
 
 ```bash
-make dataset_setup
+make dataset_preparing
+# or: make dataset_setup
 ```
 
 This will extract, convert datasets to YOLO format, and organize all files in the `data/processed/` directory.
+
+## Training (YOLO)
+
+This repository now includes a minimal Ultralytics YOLO training entry point. It creates a train/val split under `data/processed/splits/` and writes the dataset config to `data/helmet.yaml`.
+
+1. Prepare datasets (at least dataset1.zip):
+
+```bash
+make dataset_preparing
+```
+
+2. Train a YOLO model:
+
+```bash
+make train
+```
+
+Optional arguments are available via the script:
+
+```bash
+uv run python scripts/train_yolo.py --model yolov8n.pt --epochs 50 --imgsz 640 --batch 16
+```
+
+When dataset2 and dataset3 are available, place them as `data/raw/dataset2.zip` and `data/raw/dataset3.zip`, rerun `make dataset_preparing`, and then retrain.
 
 ### Expected Directory Structure
 

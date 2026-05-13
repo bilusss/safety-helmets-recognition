@@ -113,3 +113,20 @@ safety-helmets-recognition/
 ├── pyproject.toml
 └── README.md
 ```
+
+
+```
+50 epochs completed in 1.263 hours.
+Optimizer stripped from /home/bilus/PycharmProjects/safety-helmets-recognition/scripts/runs/detect/runs/helmet/weights/last.pt, 6.2MB
+Optimizer stripped from /home/bilus/PycharmProjects/safety-helmets-recognition/scripts/runs/detect/runs/helmet/weights/best.pt, 6.2MB
+
+Validating /home/bilus/PycharmProjects/safety-helmets-recognition/scripts/runs/detect/runs/helmet/weights/best.pt...
+Ultralytics 8.4.49 🚀 Python-3.12.3 torch-2.11.0+cu130 CUDA:0 (NVIDIA GeForce RTX 5070 Ti, 15820MiB)
+Model summary (fused): 73 layers, 3,006,038 parameters, 0 gradients, 8.1 GFLOPs
+                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100% ━━━━━━━━━━━━ 123/123 10.5it/s 11.8s
+                   all       5891      45452      0.927      0.896       0.94      0.574
+                  head       1822      27207      0.921      0.892      0.931      0.512
+                helmet       4667      18245      0.933      0.901      0.949      0.636
+Speed: 0.0ms preprocess, 0.5ms inference, 0.0ms loss, 0.3ms postprocess per image
+Results saved to /home/bilus/PycharmProjects/safety-helmets-recognition/scripts/runs/detect/runs/helmet
+```

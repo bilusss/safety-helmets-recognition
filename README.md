@@ -32,10 +32,35 @@ Download the following three datasets from the links below:
 Run the following command in the project folder (root directory) to automatically process and organize the datasets:
 
 ```bash
-make dataset_setup
+make dataset_preparing
+# or: make dataset_setup
 ```
 
 This will extract, convert datasets to YOLO format, and organize all files in the `data/processed/` directory.
+
+## Training (YOLO)
+
+This repository now includes a minimal Ultralytics YOLO training entry point. It creates a train/val split under `data/processed/splits/` and writes the dataset config to `data/helmet.yaml`.
+
+1. Prepare datasets (at least dataset1.zip):
+
+```bash
+make dataset_preparing
+```
+
+2. Train a YOLO model:
+
+```bash
+make train
+```
+
+Optional arguments are available via the script:
+
+```bash
+uv run python scripts/train_yolo.py --model yolov8n.pt --epochs 50 --imgsz 640 --batch 16
+```
+
+When dataset2 and dataset3 are available, place them as `data/raw/dataset2.zip` and `data/raw/dataset3.zip`, rerun `make dataset_preparing`, and then retrain.
 
 ### Expected Directory Structure
 
@@ -87,4 +112,21 @@ safety-helmets-recognition/
 ├── Makefile
 ├── pyproject.toml
 └── README.md
+```
+
+
+```
+50 epochs completed in 1.263 hours.
+Optimizer stripped from /home/bilus/PycharmProjects/safety-helmets-recognition/scripts/runs/detect/runs/helmet/weights/last.pt, 6.2MB
+Optimizer stripped from /home/bilus/PycharmProjects/safety-helmets-recognition/scripts/runs/detect/runs/helmet/weights/best.pt, 6.2MB
+
+Validating /home/bilus/PycharmProjects/safety-helmets-recognition/scripts/runs/detect/runs/helmet/weights/best.pt...
+Ultralytics 8.4.49 🚀 Python-3.12.3 torch-2.11.0+cu130 CUDA:0 (NVIDIA GeForce RTX 5070 Ti, 15820MiB)
+Model summary (fused): 73 layers, 3,006,038 parameters, 0 gradients, 8.1 GFLOPs
+                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100% ━━━━━━━━━━━━ 123/123 10.5it/s 11.8s
+                   all       5891      45452      0.927      0.896       0.94      0.574
+                  head       1822      27207      0.921      0.892      0.931      0.512
+                helmet       4667      18245      0.933      0.901      0.949      0.636
+Speed: 0.0ms preprocess, 0.5ms inference, 0.0ms loss, 0.3ms postprocess per image
+Results saved to /home/bilus/PycharmProjects/safety-helmets-recognition/scripts/runs/detect/runs/helmet
 ```

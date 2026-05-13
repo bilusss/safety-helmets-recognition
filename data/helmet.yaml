@@ -1,0 +1,6 @@
+path: /workspaces/safety-helmets-recognition/data/processed/splits
+train: images/train
+val: images/val
+names:
+  0: head
+  1: helmet

@@ -7,4 +7,6 @@ dependencies = [
     "numpy",
     "pandas",
     "ultralytics",
+    "opencv-python",
+    "yt-dlp",
 ]

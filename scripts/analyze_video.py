@@ -360,8 +360,14 @@ def main() -> None:
     else:
         video_path = Path(args.source)
         if not video_path.exists():
-            print(f"Video file not found: {video_path}")
-            sys.exit(1)
+            # also try relative to the project root, so paths work regardless
+            # of the current working directory (e.g. when run from scripts/)
+            alt = ROOT / args.source
+            if alt.exists():
+                video_path = alt
+            else:
+                print(f"Video file not found: {args.source}")
+                sys.exit(1)
         process_video(input_source=str(video_path), **common)
 
 

@@ -118,9 +118,20 @@ The `analyze_video.py` script runs helmet detection on a local video file, a You
 It runs in two modes:
 
 - **Batch (default):** processes the whole video and writes an annotated `.mp4` to `outputs/video/`.
-- **Live (`--show`):** opens a window and plays the video back **in real time** with detections drawn on each frame, an FPS counter, and a red `NO HELMET` banner whenever a bare head is detected. Press `q` or `ESC` to stop. This is the real-time mode for demos and webcams.
+- **Live (`--show`):** opens a window and plays the video back **in real time** with detections drawn on each frame, an FPS counter, and a red `NO HELMET` banner. Press `q` or `ESC` to stop. This is the real-time mode for demos and webcams.
 
 Since YOLOv8n inference is ~0.5 ms/frame on GPU, live playback keeps up with normal video frame rates; the preview is paced to the source FPS so a file plays at natural speed.
+
+#### Alarm Debouncing
+
+To avoid false alarms from a single misdetected frame, the `NO HELMET` banner is **debounced**: it fires only after a bare head has been detected for a sustained period (default **2 seconds of video time**), and it tolerates brief detection dropouts so flicker neither delays nor clears it. While a bare head is present but the alarm has not tripped yet, the status line shows a count-up (e.g. `[1.3/2.0s]`). When the alarm trips, a line is also printed to the console.
+
+The delay is measured in *video time* (`frame_idx / fps`), so the same `--alarm-seconds` means the same number of seconds of footage whether you run live, in batch, or from a webcam. Tune it with `--alarm-seconds` (use `0` to alarm immediately on any detection):
+
+```bash
+# only alarm after 3 s of continuous no-helmet
+uv run python scripts/analyze_video.py footage.mp4 --show --alarm-seconds 3
+```
 
 ### Linux
 
@@ -204,6 +215,8 @@ options:
                         Stop after this many seconds. Useful for long YouTube videos.
   --show                Display annotated frames live in a window, in real time (q/ESC to quit).
   --no-save             Do not write an output file (use with --show for a pure live preview).
+  --alarm-seconds SEC   Raise the NO-HELMET alarm only after a bare head persists this many
+                        seconds of video (default: 2.0; use 0 to alarm immediately).
 ```
 
 ### Examples

@@ -26,6 +26,50 @@ CLASS_NAMES = {
 WINDOW_NAME = "Safety Helmet Detection - press q or ESC to quit"
 
 
+class HelmetAlarm:
+    """Debounced 'no helmet' alarm.
+
+    Fires only after a bare head has been present for at least
+    ``trigger_seconds`` (measured in video time, not processing time). Brief
+    detection dropouts shorter than ``clear_seconds`` are bridged, so
+    single-frame flicker neither delays the alarm during count-up nor clears
+    it once active. The alarm clears after the bare head has been gone for
+    longer than ``clear_seconds``; re-arming then requires another full
+    ``trigger_seconds`` of presence.
+
+    ``clear_seconds`` is capped at ``trigger_seconds / 2`` so a momentary
+    false detection can never, on its own, reach the trigger threshold.
+    """
+
+    def __init__(self, trigger_seconds: float = 2.0, clear_seconds: float = 1.0):
+        self.trigger_seconds = max(0.0, trigger_seconds)
+        self.clear_seconds = min(clear_seconds, self.trigger_seconds / 2)
+        self.present_since: float | None = None
+        self.last_seen: float | None = None
+        self.active = False
+
+    def update(self, head_present: bool, now: float) -> bool:
+        if head_present:
+            if self.present_since is None:
+                self.present_since = now
+            self.last_seen = now
+        elif self.last_seen is not None and (now - self.last_seen) > self.clear_seconds:
+            # gone for longer than the grace period -> reset the streak
+            self.present_since = None
+            self.last_seen = None
+            self.active = False
+
+        if self.present_since is not None and (now - self.present_since) >= self.trigger_seconds:
+            self.active = True
+        return self.active
+
+    def dwell_at(self, now: float) -> float:
+        """How long (s) the current bare-head streak has lasted, 0 if none."""
+        if self.present_since is None:
+            return 0.0
+        return max(0.0, now - self.present_since)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run helmet detection on a video file, YouTube URL, or webcam."
@@ -77,6 +121,14 @@ def parse_args() -> argparse.Namespace:
         dest="save",
         action="store_false",
         help="Do not write an output video file (use with --show for a pure live preview).",
+    )
+    parser.add_argument(
+        "--alarm-seconds",
+        type=float,
+        default=2.0,
+        help="Raise the NO-HELMET alarm only after a bare head has been detected "
+             "for at least this many seconds of video (default: 2.0). Use 0 to "
+             "alarm immediately on any detection.",
     )
     parser.set_defaults(save=True)
     return parser.parse_args()
@@ -172,22 +224,35 @@ def draw_detections(frame, results, font_scale: float = 0.6, thickness: int = 2)
     return frame, counts
 
 
-def draw_hud(frame, head_count: int, helmet_count: int, fps: float):
-    """Overlay a live status line and a warning banner when a bare head is present."""
+def draw_hud(
+    frame,
+    head_count: int,
+    helmet_count: int,
+    fps: float,
+    alarm_active: bool,
+    dwell: float,
+    trigger_seconds: float,
+):
+    """Overlay a live status line and, once the alarm has tripped, a warning banner."""
     import cv2
 
     h, w = frame.shape[:2]
 
     status = f"FPS: {fps:5.1f}   helmets: {helmet_count}   no-helmet: {head_count}"
+    # while a bare head is present but the alarm has not tripped yet, show the
+    # count-up toward the trigger so the debounce delay is visible
+    if head_count > 0 and not alarm_active and trigger_seconds > 0:
+        status += f"   [{min(dwell, trigger_seconds):.1f}/{trigger_seconds:.1f}s]"
     cv2.rectangle(frame, (0, 0), (w, 34), (0, 0, 0), -1)
     cv2.putText(
         frame, status, (10, 24),
         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA,
     )
 
-    # the assignment is about detecting MISSING helmets -> make it loud
-    if head_count > 0:
-        banner = f"!! NO HELMET: {head_count} !!"
+    # the assignment is about detecting MISSING helmets -> make it loud,
+    # but only once the bare head has persisted long enough
+    if alarm_active:
+        banner = f"!! NO HELMET {dwell:.1f}s !!"
         (tw, th), bl = cv2.getTextSize(banner, cv2.FONT_HERSHEY_SIMPLEX, 0.9, 3)
         cx = max(10, (w - tw) // 2)
         cv2.rectangle(frame, (cx - 12, 40), (cx + tw + 12, 40 + th + bl + 16), (0, 0, 255), -1)
@@ -207,6 +272,7 @@ def process_video(
     imgsz: int,
     device: str | None,
     max_duration: int | None,
+    alarm_seconds: float,
     show: bool,
     save: bool,
 ) -> None:
@@ -259,6 +325,9 @@ def process_video(
         print("Live preview: press 'q' or ESC in the window to stop.")
         cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
 
+    alarm = HelmetAlarm(trigger_seconds=alarm_seconds)
+    prev_active = False
+
     fps_ema = fps
     frame_idx = 0
     try:
@@ -274,10 +343,22 @@ def process_video(
             results = model.predict(frame, **predict_kwargs)
             annotated, counts = draw_detections(frame, results)
 
+            # drive the alarm on video time (frame_idx / fps) so the delay means
+            # the same number of seconds of footage in live, batch and webcam runs
+            video_ts = frame_idx / fps
+            alarm_active = alarm.update(counts.get(0, 0) > 0, video_ts)
+            dwell = alarm.dwell_at(video_ts)
+            if alarm_active and not prev_active:
+                print(f"[ALARM] no helmet for >= {alarm_seconds:.1f}s (at {video_ts:.1f}s of video)")
+            prev_active = alarm_active
+
             proc_dt = time.perf_counter() - t0
             inst_fps = 1.0 / proc_dt if proc_dt > 0 else 0.0
             fps_ema = 0.9 * fps_ema + 0.1 * inst_fps
-            annotated = draw_hud(annotated, counts.get(0, 0), counts.get(1, 0), fps_ema)
+            annotated = draw_hud(
+                annotated, counts.get(0, 0), counts.get(1, 0), fps_ema,
+                alarm_active, dwell, alarm_seconds,
+            )
 
             if writer is not None:
                 writer.write(annotated)
@@ -346,6 +427,7 @@ def main() -> None:
         imgsz=args.imgsz,
         device=args.device,
         max_duration=args.max_duration,
+        alarm_seconds=args.alarm_seconds,
         show=args.show,
         save=args.save,
     )

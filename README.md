@@ -113,7 +113,14 @@ The script creates a train/val split (80/20) under `data/processed/splits/`, wri
 
 ## Video Analysis
 
-The `analyze_video.py` script runs helmet detection on a local video file or a YouTube URL and produces an annotated output video. Detections are drawn as bounding boxes: green for helmets, red for bare heads.
+The `analyze_video.py` script runs helmet detection on a local video file, a YouTube URL, or a webcam. Detections are drawn as bounding boxes: green for helmets, red for bare heads.
+
+It runs in two modes:
+
+- **Batch (default):** processes the whole video and writes an annotated `.mp4` to `outputs/video/`.
+- **Live (`--show`):** opens a window and plays the video back **in real time** with detections drawn on each frame, an FPS counter, and a red `NO HELMET` banner whenever a bare head is detected. Press `q` or `ESC` to stop. This is the real-time mode for demos and webcams.
+
+Since YOLOv8n inference is ~0.5 ms/frame on GPU, live playback keeps up with normal video frame rates; the preview is paced to the source FPS so a file plays at natural speed.
 
 ### Linux
 
@@ -145,16 +152,47 @@ cd scripts
 uv run python analyze_video.py "https://www.youtube.com/watch?v=XXXXXXXXXXX"
 ```
 
+### Live Preview (Real Time)
+
+Add `--show` to watch the detection live in a window instead of waiting for an output file.
+
+Linux:
+
+```bash
+# local file, live window (also saves the annotated file)
+make show_video SOURCE=path/to/video.mp4
+
+# YouTube video, live window
+make show_youtube URL="https://www.youtube.com/watch?v=XXXXXXXXXXX"
+
+# webcam, live window only (no file written); CAM defaults to 0
+make webcam
+make webcam CAM=1
+```
+
+Windows / direct `uv run`:
+
+```powershell
+cd scripts
+# local file, live preview only (no file written)
+uv run python analyze_video.py path\to\video.mp4 --show --no-save
+
+# webcam index 0, live preview
+uv run python analyze_video.py 0 --show --no-save
+```
+
+`--show` opens a live window; `--no-save` skips writing the output file (use it for a pure preview). Without `--show`, the script runs in batch mode and only writes the output file, as before. Press `q` or `ESC` in the window to stop early.
+
 ### All Options
 
 ```
 usage: analyze_video.py [-h] [--model MODEL] [--output OUTPUT]
                         [--conf CONF] [--imgsz IMGSZ] [--device DEVICE]
-                        [--max-duration MAX_DURATION]
+                        [--max-duration MAX_DURATION] [--show] [--no-save]
                         source
 
 positional arguments:
-  source                Path to a local video file or a YouTube URL.
+  source                Path to a local video file, a YouTube URL, or a webcam index (e.g. 0).
 
 options:
   --model MODEL         Path to trained YOLO weights. Default: best.pt from the last training run.
@@ -164,6 +202,8 @@ options:
   --device DEVICE       Device: 0 for first GPU, cpu for CPU.
   --max-duration MAX_DURATION
                         Stop after this many seconds. Useful for long YouTube videos.
+  --show                Display annotated frames live in a window, in real time (q/ESC to quit).
+  --no-save             Do not write an output file (use with --show for a pure live preview).
 ```
 
 ### Examples
